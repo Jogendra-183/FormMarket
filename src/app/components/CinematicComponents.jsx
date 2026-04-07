@@ -1,6 +1,109 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sun, Moon, X, Play } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './ui/utils';
+
+/**
+ * 5-SECOND CINEMATIC INTRO VIDEO
+ */
+export const CinematicIntro = ({ onComplete }) => {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    const timer = setTimeout(() => {
+       document.body.style.overflow = '';
+       onComplete();
+    }, 5500); 
+    return () => {
+      document.body.style.overflow = '';
+      clearTimeout(timer);
+    };
+  }, [onComplete]);
+
+  const particles = Array.from({ length: 40 }).map((_, i) => ({
+    id: i,
+    startX: (Math.random() - 0.5) * 100 + "vw",
+    startY: (Math.random() - 0.5) * 100 + "vh",
+    endX: (Math.random() - 0.5) * 10 + "vw",
+    endY: (Math.random() - 0.5) * 10 + "vh",
+    delay: Math.random() * 2
+  }));
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#030504] overflow-hidden"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 1 }}
+    >
+       <motion.div
+         className="absolute inset-0 pointer-events-none"
+         style={{
+           backgroundImage: 'radial-gradient(circle at center, rgba(135, 175, 80, 0.25) 0%, rgba(255,200,50,0.1) 30%, rgba(0,0,0,0) 70%)',
+         }}
+         initial={{ opacity: 0, scale: 0.5 }}
+         animate={{ opacity: 1, scale: 1.5 }}
+         transition={{ duration: 4, ease: 'easeOut' }}
+       />
+
+       <motion.div
+         className="absolute inset-0 opacity-40 mix-blend-screen pointer-events-none z-10"
+         style={{
+           background: 'conic-gradient(from 90deg at 50% 120%, transparent, rgba(250, 204, 21, 0.15) 35%, rgba(135, 175, 80, 0.2) 45%, transparent 55%)',
+           filter: 'blur(50px)',
+         }}
+         initial={{ opacity: 0, rotate: -5 }}
+         animate={{ opacity: 0.8, rotate: 5 }}
+         transition={{ duration: 5, ease: 'easeInOut' }}
+       />
+       
+       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+         {particles.map((p) => (
+           <motion.div
+             key={p.id}
+             className="absolute w-1.5 h-1.5 bg-amber-200/50 rounded-full blur-[1px]"
+             initial={{ 
+               x: p.startX, 
+               y: p.startY,
+               opacity: 0,
+               scale: 0
+             }}
+             animate={{ 
+               x: [p.startX, p.endX, 0], 
+               y: [p.startY, p.endY, 0],
+               opacity: [0, 1, 0],
+               scale: [0, 1.5, 0]
+             }}
+             transition={{ duration: 3.5, delay: p.delay, ease: "easeInOut" }}
+           />
+         ))}
+       </div>
+
+       <motion.div
+         className="relative z-30 flex flex-col items-center mt-[-5%]"
+         initial={{ opacity: 0, scale: 0.85, filter: 'blur(20px)' }}
+         animate={{ opacity: 1, scale: 1.05, filter: 'blur(0px)' }}
+         transition={{ duration: 3, delay: 1.5, ease: 'easeOut' }}
+       >
+         <motion.div 
+           className="text-4xl md:text-6xl lg:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-amber-300 drop-shadow-[0_0_30px_rgba(16,185,129,0.5)] text-center px-4"
+           animate={{ textShadow: ["0 0 10px rgba(16,185,129,0)", "0 0 50px rgba(16,185,129,0.6)", "0 0 20px rgba(16,185,129,0.3)"] }}
+           transition={{ duration: 2, delay: 3.5, repeat: Infinity, repeatType: 'reverse' }}
+         >
+           Farmer Marketplace
+         </motion.div>
+         <motion.p
+           className="mt-6 text-lg md:text-2xl lg:text-3xl text-amber-50/80 tracking-[0.2em] uppercase font-light text-center px-4"
+           initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+           transition={{ duration: 1.5, delay: 3, ease: 'easeOut' }}
+         >
+           Empowering Farmers.<br className="md:hidden" /> Connecting Markets.
+         </motion.p>
+       </motion.div>
+    </motion.div>
+  );
+};
 
 /**
  * CINEMATIC LETTERBOX COMPONENT
@@ -33,11 +136,12 @@ export const CinematicOverlay = ({ isActive, onClose }) => {
 /**
  * THEME TOGGLE
  */
-export const ThemeToggle = ({ theme, toggleTheme, className }) => (
+export const ThemeToggle = ({ theme, toggleTheme, className, inline = false }) => (
   <button 
     onClick={toggleTheme}
     className={cn(
-      `fixed top-8 right-8 z-50 p-3 rounded-2xl border transition-all duration-500 group overflow-hidden`,
+      `p-3 rounded-2xl border transition-all duration-500 group overflow-hidden`,
+      inline ? 'z-10' : 'fixed top-8 right-8 z-50',
       theme === 'dark' 
         ? 'bg-white/5 border-white/10 hover:bg-white/10' 
         : 'bg-black/5 border-black/10 hover:bg-black/10',

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { motion } from "motion/react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import DashboardLayout from "../components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -15,8 +15,9 @@ import {
   DialogTitle,
   DialogTrigger
 } from "../components/ui/dialog";
-import { MessageSquare, ThumbsUp, Search, Plus, TrendingUp, Users, User } from "lucide-react";
-import { forumPosts } from "../utils/mockData";
+import { MessageSquare, ThumbsUp, Search, Plus, TrendingUp, Users, User, Loader2 } from "lucide-react";
+import { forumPosts as mockForumPosts } from "../utils/mockData";
+import { communityApi } from "../utils/api";
 import { toast } from "sonner";
 
 // PostCard Component
@@ -24,13 +25,18 @@ function PostCard({ post, index }) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes);
 
-  const handleLike = () => {
+  const handleLike = async () => {
     if (liked) {
       setLikeCount(likeCount - 1);
       setLiked(false);
     } else {
       setLikeCount(likeCount + 1);
       setLiked(true);
+      try {
+         await communityApi.likePost(post.id);
+      } catch {
+         // ignore
+      }
     }
   };
 
@@ -57,16 +63,16 @@ function PostCard({ post, index }) {
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-                  <span className="font-medium">{post.author}</span>
+                  <span className="font-medium">{post.authorName || post.author}</span>
                   <span>•</span>
-                  <span>{post.date}</span>
+                  <span>{post.date || new Date().toLocaleDateString()}</span>
                   <span>•</span>
                   <Badge variant="outline" className="text-xs">
-                    {post.category}
+                    {post.category || 'General Discussion'}
                   </Badge>
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
-                  {post.preview}
+                  {post.content || post.preview || post.excerpt}
                 </p>
               </div>
             </div>
@@ -100,22 +106,56 @@ function Community() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [forumPosts, setForumPosts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleCreatePost = () => {
+  const fetchPosts = async () => {
+    try {
+      setIsLoading(true);
+      const data = await communityApi.getPosts();
+      if (Array.isArray(data)) {
+        setForumPosts(data);
+      } else if (data && Array.isArray(data.content)) {
+        setForumPosts(data.content);
+      } else {
+        setForumPosts(mockForumPosts);
+      }
+    } catch (error) {
+      console.error("Fetch posts failed:", error);
+      toast.error("Offline mode. Showing cached posts.");
+      setForumPosts(mockForumPosts);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const handleCreatePost = async () => {
     if (!title.trim() || !content.trim()) {
       toast.error("Please fill in all fields");
       return;
     }
-    toast.success("Post created successfully!");
-    setTitle("");
-    setContent("");
-    setOpen(false);
+    
+    try {
+      // Map display names to backend enum values
+      await communityApi.createPost({ title, content, category: "GENERAL" });
+      toast.success("Post created successfully!");
+      setTitle("");
+      setContent("");
+      setOpen(false);
+      fetchPosts();
+    } catch (error) {
+      toast.error("Could not create post. Backend unreachable.");
+    }
   };
 
   const categories = [
-    { name: "Farming Tips", count: 145, icon: TrendingUp },
-    { name: "Product Reviews", count: 89, icon: MessageSquare },
-    { name: "General Discussion", count: 234, icon: Users },
+    { name: "Farming Tips", value: "FARMING_TIPS", count: 145, icon: TrendingUp },
+    { name: "Product Reviews", value: "MARKET_UPDATES", count: 89, icon: MessageSquare },
+    { name: "General Discussion", value: "GENERAL", count: 234, icon: Users },
   ];
 
   return (
@@ -236,29 +276,41 @@ function Community() {
             </div>
 
             <TabsContent value="all" className="mt-6">
+              {isLoading ? (
+                <div className="flex justify-center p-12"><Loader2 className="animate-spin h-8 w-8 text-indigo-600" /></div>
+              ) : (
               <div className="space-y-4">
                 {forumPosts.map((post, index) => (
                   <PostCard key={post.id} post={post} index={index} />
                 ))}
               </div>
+              )}
             </TabsContent>
 
             <TabsContent value="popular" className="mt-6">
+              {isLoading ? (
+                <div className="flex justify-center p-12"><Loader2 className="animate-spin h-8 w-8 text-indigo-600" /></div>
+              ) : (
               <div className="space-y-4">
                 {[...forumPosts]
-                  .sort((a, b) => b.likes - a.likes)
+                  .sort((a, b) => (b.likes || 0) - (a.likes || 0))
                   .map((post, index) => (
                     <PostCard key={post.id} post={post} index={index} />
                   ))}
               </div>
+              )}
             </TabsContent>
 
             <TabsContent value="recent" className="mt-6">
+              {isLoading ? (
+                <div className="flex justify-center p-12"><Loader2 className="animate-spin h-8 w-8 text-indigo-600" /></div>
+              ) : (
               <div className="space-y-4">
                 {[...forumPosts].reverse().map((post, index) => (
                   <PostCard key={post.id} post={post} index={index} />
                 ))}
               </div>
+              )}
             </TabsContent>
           </Tabs>
         </motion.div>

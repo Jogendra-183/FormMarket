@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { motion } from "motion/react";
 import DashboardLayout from "../../components/DashboardLayout";
@@ -26,36 +27,75 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { analyticsData, orders } from "../../utils/mockData";
+import { analyticsData, orders as mockOrders } from "../../utils/mockData";
+import { userApi, orderApi } from "../../utils/api";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b"];
 
 function FarmerDashboard() {
+  const [dashboardData, setDashboardData] = useState(null);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        const [dashResponse, ordersResponse] = await Promise.all([
+          userApi.getFarmerDashboard().catch(() => null),
+          orderApi.getFarmerOrders().catch(() => null)
+        ]);
+
+        if (dashResponse) {
+          setDashboardData(dashResponse);
+        }
+        
+        if (ordersResponse) {
+           const items = Array.isArray(ordersResponse) ? ordersResponse : 
+                         (ordersResponse.content ? ordersResponse.content : []);
+           setRecentOrders(items);
+        } else {
+           setRecentOrders(mockOrders);
+        }
+      } catch (error) {
+        console.error("Dashboard data fetch failed:", error);
+        toast.error("Could not reach backend. Using cached data.");
+        setRecentOrders(mockOrders);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
+  }, []);
+
   const stats = [
     {
       title: "Total Revenue",
-      value: "$8,124",
+      value: dashboardData?.totalRevenue ? `$${dashboardData.totalRevenue}` : "$8,124",
       change: "+12.5%",
       trend: "up",
       icon: DollarSign
     },
     {
       title: "Products Listed",
-      value: "24",
+      value: dashboardData?.productsListed?.toString() || "24",
       change: "+3",
       trend: "up",
       icon: Package
     },
     {
       title: "Active Orders",
-      value: "12",
+      value: dashboardData?.activeOrders?.toString() || "12",
       change: "-2",
       trend: "down",
       icon: ShoppingCart
     },
     {
       title: "Growth Rate",
-      value: "18.2%",
+      value: dashboardData?.growthRate ? `${dashboardData.growthRate}%` : "18.2%",
       change: "+4.1%",
       trend: "up",
       icon: TrendingUp
@@ -67,19 +107,22 @@ function FarmerDashboard() {
       label: "Add new listing",
       description: "Publish today's harvest in minutes",
       icon: Plus,
-      path: "/farmer/products"
+      path: "/farmer/products",
+      color: "from-emerald-500 to-teal-500"
     },
     {
       label: "Review open orders",
       description: "Check fulfillment and buyer notes",
       icon: ShoppingCart,
-      path: "/farmer/orders"
+      path: "/farmer/orders",
+      color: "from-indigo-500 to-purple-500"
     },
     {
       label: "Message the community",
       description: "Answer questions and build trust",
       icon: MessageSquare,
-      path: "/community"
+      path: "/community",
+      color: "from-amber-500 to-orange-500"
     }
   ];
 
@@ -124,6 +167,9 @@ function FarmerDashboard() {
         </motion.div>
 
         {/* Stats Grid */}
+        {isLoading ? (
+          <div className="flex justify-center p-12"><Loader2 className="animate-spin h-12 w-12 text-indigo-600" /></div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
@@ -159,6 +205,7 @@ function FarmerDashboard() {
             );
           })}
         </div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -279,23 +326,23 @@ function FarmerDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {orders.slice(0, 4).map((order) => (
+                  {recentOrders.slice(0, 4).map((order) => (
                     <div
                       key={order.id}
                       className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border rounded-2xl hover:shadow-md transition-all"
                     >
                       <div>
                         <p className="font-bold text-lg">{order.id}</p>
-                        <p className="text-sm text-muted-foreground">{order.customer}</p>
-                        <p className="text-sm text-muted-foreground mt-1">{order.items.join(", ")}</p>
+                        <p className="text-sm text-muted-foreground">{order.customer || order.buyer?.name || "Local Buyer"}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{(order.items || []).map(i => i.product?.name || i).join(", ")}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-xl mb-1">${order.total.toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground mb-2">{order.date}</p>
+                        <p className="font-bold text-xl mb-1">${(order.total || 0).toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground mb-2">{order.date || new Date().toISOString().split('T')[0]}</p>
                         <Badge className={
-                          order.status === "Delivered"
+                          order.status === "DELIVERED" || order.status === "Delivered"
                             ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
-                            : order.status === "Processing"
+                            : order.status === "PROCESSING" || order.status === "Processing"
                             ? "bg-amber-100 text-amber-700 hover:bg-amber-100"
                             : "bg-sky-100 text-sky-700 hover:bg-sky-100"
                         }>
@@ -304,6 +351,11 @@ function FarmerDashboard() {
                       </div>
                     </div>
                   ))}
+                  {recentOrders.length === 0 && (
+                     <div className="p-4 text-center text-muted-foreground border rounded-2xl">
+                       No recent orders found.
+                     </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

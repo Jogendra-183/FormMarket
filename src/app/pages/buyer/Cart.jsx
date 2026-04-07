@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useCart } from "../../contexts/CartContext";
 import { toast } from "sonner";
+import { orderApi } from "../../utils/api";
 
 // Multi-Step Checkout Dialog
 function CheckoutDialog({ isOpen, onClose, items, total }) {
@@ -100,12 +101,33 @@ function CheckoutDialog({ isOpen, onClose, items, total }) {
 
   const handlePlaceOrder = async () => {
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const newOrderId = `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    setOrderId(newOrderId);
-    setIsSubmitting(false);
-    setStep(4);
-    toast.success("Order placed successfully!");
+    try {
+      // Create backend-friendly order request matching OrderRequest.java
+      const orderRequest = {
+        shippingAddress: formData.address,
+        shippingCity: formData.city,
+        shippingState: formData.state,
+        shippingZip: formData.zipCode,
+        notes: formData.deliveryNotes,
+        paymentMethod: formData.paymentMethod.toUpperCase(),
+        items: items.map(item => ({
+          productId: item.product?.id || item.productId,
+          quantity: item.quantity
+        }))
+      };
+      
+      const response = await orderApi.placeOrder(orderRequest);
+      setOrderId(response.orderNumber || `ORD-${response.id || Math.random().toString(36).substr(2, 9).toUpperCase()}`);
+    } catch (error) {
+      console.error("Order placement failed:", error);
+      toast.error("Could not reach backend. Creating an offline order.");
+      // Fallback
+      setOrderId(`ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`);
+    } finally {
+      setIsSubmitting(false);
+      setStep(4);
+      toast.success("Order placed successfully!");
+    }
   };
 
   const handleClose = () => {

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import DashboardLayout from "../../components/DashboardLayout";
 import { Badge } from "../../components/ui/badge";
@@ -30,8 +31,31 @@ import {
   Legend
 } from "recharts";
 import { analyticsData } from "../../utils/mockData";
+import { userApi } from "../../utils/api";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+
 const COLORS = ["#1f5b3b", "#4f8ea0", "#f5b84b", "#d67c5a"];
+
 function FarmerAnalytics() {
+  const [dashboardData, setDashboardData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const data = await userApi.getFarmerDashboard();
+        setDashboardData(data);
+      } catch (error) {
+        console.error("Fetch analytics data failed:", error);
+        toast.error("Could not reach backend. Showing offline analytics.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
   const customerData = [
     { month: "Jan", new: 12, returning: 34 },
     { month: "Feb", new: 19, returning: 42 },
@@ -85,6 +109,9 @@ function FarmerAnalytics() {
                   <StaggerContainer className="space-y-6">
                     <StaggerItem>
                       <ScrollReveal>
+                        {isLoading ? (
+                          <div className="flex justify-center p-12"><Loader2 className="animate-spin h-8 w-8 text-indigo-600" /></div>
+                        ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <SlideIn direction="left" delay={0.2}>
                             <HoverLift>
@@ -148,10 +175,11 @@ function FarmerAnalytics() {
                                     </PieChart>
                                   </ResponsiveContainer>
                                 </CardContent>
-                              </Card>
-                            </HoverLift>
-                          </SlideIn>
-                        </div>
+                                </Card>
+                              </HoverLift>
+                            </SlideIn>
+                          </div>
+                        )}
                       </ScrollReveal>
                     </StaggerItem>
 
@@ -195,7 +223,7 @@ function FarmerAnalytics() {
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                  <CountUpNumber value="$48,724" />
+                                  <CountUpNumber value={dashboardData?.totalRevenue ? `$${dashboardData.totalRevenue}` : "$48,724"} />
                                   <p className="text-sm text-primary">+18.2% from last month</p>
                                 </CardContent>
                               </Card>
@@ -225,7 +253,7 @@ function FarmerAnalytics() {
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                  <CountUpNumber value="722" />
+                                  <CountUpNumber value={dashboardData?.activeOrders?.toString() || "722"} />
                                   <p className="text-sm text-primary">+12.5% from last month</p>
                                 </CardContent>
                               </Card>

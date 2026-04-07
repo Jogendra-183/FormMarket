@@ -18,8 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
-import { subscriptionPlans } from "../../utils/mockData";
+import { subscriptionPlans as mockSubscriptionPlans } from "../../utils/mockData";
 import { toast } from "sonner";
+import { subscriptionApi } from "../../utils/api";
 
 // Multi-Step Subscription Dialog Component
 function SubscriptionUpgradeDialog({ isOpen, onClose, selectedPlan, currentPlan }) {
@@ -86,12 +87,34 @@ function SubscriptionUpgradeDialog({ isOpen, onClose, selectedPlan, currentPlan 
 
   const handleSubmitRequest = async () => {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsSubmitting(false);
-    setRequestStatus('pending');
-    setStep(3);
-    toast.success("Upgrade request submitted! Waiting for admin approval.");
+    try {
+      // Match backend SubscriptionUpgradeRequest.java
+      const upgradeRequest = {
+        planType: selectedPlan.name.toUpperCase(), // PREMIUM or ENTERPRISE
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
+        cardLastFour: formData.cardNumber.replace(/\s/g, '').slice(-4),
+        billingAddress: formData.billingAddress
+      };
+      await subscriptionApi.requestUpgrade(upgradeRequest);
+      setRequestStatus('pending');
+      setStep(3);
+      toast.success("Upgrade request submitted! Waiting for admin approval.");
+    } catch (error) {
+      console.error("Upgrade request failed:", error);
+      toast.error("Could not reach backend. Simulating offline upgrade.");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setRequestStatus('pending');
+      setStep(3);
+      toast.success("Upgrade request simulated (offline)!");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Simulate admin approval (you can call this when admin approves)
@@ -574,7 +597,32 @@ function SubscriptionUpgradeDialog({ isOpen, onClose, selectedPlan, currentPlan 
 
 // Main Subscription Page
 function BuyerSubscription() {
-  const currentPlan = "premium";
+  const [currentPlan, setCurrentPlan] = useState("basic");
+  const [subscriptionPlans, setSubscriptionPlans] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchSubscriptionData = async () => {
+      try {
+        setIsLoading(true);
+        const data = await subscriptionApi.getMine();
+        if (data && data.planType) {
+          setCurrentPlan(data.planType.toLowerCase());
+        }
+        setSubscriptionPlans(mockSubscriptionPlans); // No plans API yet, use mock for display
+      } catch (error) {
+        console.error("Failed to fetch subscription:", error);
+        toast.error("Could not reach server. Showing cached plan data.");
+        // Fallback to basic plan + mock plans
+        setCurrentPlan("basic");
+        setSubscriptionPlans(mockSubscriptionPlans);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSubscriptionData();
+  }, []);
+
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
   const [selectedPlanForUpgrade, setSelectedPlanForUpgrade] = useState(null);
 

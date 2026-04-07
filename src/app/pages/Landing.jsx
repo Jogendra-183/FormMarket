@@ -1,6 +1,6 @@
 import { Link } from "react-router";
-import { useState } from "react";
-import { motion } from "motion/react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -13,6 +13,7 @@ import {
   ThreeDCard,
   CinematicOverlay
 } from "../components/CinematicComponents";
+import { CinematicIntro } from "../components/CinematicIntro";
 import { 
   AnimatedPage, 
   StaggerContainer, 
@@ -48,6 +49,13 @@ import { forumPosts, products, subscriptionPlans, successStories } from "../util
 function Landing() {
   const { theme, toggleTheme } = useTheme();
   const [isCinematic, setIsCinematic] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
+  const [introComplete, setIntroComplete] = useState(false);
+
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+    setIntroComplete(true);
+  };
 
   const heroStats = [
     { label: "Farmers onboarded", value: "2.4k", icon: Users },
@@ -74,11 +82,21 @@ function Landing() {
   ];
 
   return (
-    <div className={`min-h-screen font-sans transition-all duration-1000 ${
-      theme === 'dark' ? 'text-white' : 'text-slate-900'
-    } ${isCinematic ? 'overflow-hidden' : ''}`}>
+    <>
+      {/* Cinematic Intro Video */}
+      {showIntro && (
+        <CinematicIntro onComplete={handleIntroComplete} theme={theme} />
+      )}
+
+      <motion.div 
+        className={`min-h-screen font-sans transition-all duration-1000 ${
+          theme === 'dark' ? 'text-white' : 'text-slate-900'
+        } ${isCinematic ? 'overflow-hidden' : ''}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: introComplete ? 1 : 0 }}
+        transition={{ duration: 0.8 }}
+      >
       <CinematicReelBackground theme={theme} isCinematic={isCinematic} />
-      <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
       <CinematicOverlay isActive={isCinematic} onClose={() => setIsCinematic(false)} />
       
       {/* Hero Section */}
@@ -114,6 +132,7 @@ function Landing() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
+              <ThemeToggle theme={theme} toggleTheme={toggleTheme} inline={true} />
               <Link to="/login">
                 <Button variant="ghost" size="lg" className="rounded-2xl">
                   Login
@@ -243,19 +262,6 @@ function Landing() {
               </motion.div>
             ))}
           </div>
-
-          <motion.div
-            className="text-center"
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7 }}
-            viewport={{ once: true }}
-          >
-            <MagneticButton theme={theme} onClick={() => setIsCinematic(true)}>
-              <Film size={20} />
-              <span>Experience Cinema Mode</span>
-            </MagneticButton>
-          </motion.div>
         </div>
       </section>
 
@@ -354,7 +360,8 @@ function Landing() {
           </div>
         </div>
       </footer>
-    </div>
+      </motion.div>
+    </>
   );
 }
 
